@@ -1,0 +1,64 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AudioList",
+            "Effect": "Allow",
+            "Action": "s3:ListBucket",
+            "Resource": "arn:aws:s3:::<S3_BATCH_BUCKET_NAME>"
+        },
+        {
+            "Sid": "AudioData",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject"
+            ],
+            "Resource": "arn:aws:s3:::<S3_BATCH_BUCKET_NAME>/*"
+        },
+        {
+            "Sid": "AudioComm1",
+            "Effect": "Allow",
+            "Action": [
+                "transcribe:*"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "AudioComm2",
+            "Effect": "Allow",
+            "Action": [
+                "polly:*"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "AudioPoll",
+            "Effect": "Allow",
+            "Action": [
+                "sqs:DeleteMessage",
+                "sqs:ReceiveMessage",
+                "sqs:PurgeQueue"
+            ],
+            "Resource": "arn:aws:sqs:<AWS_REGION>:<AWS_ACCOUNT_ID>:<QUEUE_PREFIX_NAME>-*"
+        },
+        {
+            "Sid": "AudioLambda",
+            "Effect": "Allow",
+            "Action": [
+                "lambda:InvokeFunction"
+            ],
+            "Resource": "arn:aws:lambda:<AWS_REGION>:<AWS_ACCOUNT_ID>:function:<FUNCTION_NAME>"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cognito-identity:GetCredentialsForIdentity"
+            ],
+            "Resource": [
+                "*"
+            ]
+        }
+    ]
+}
