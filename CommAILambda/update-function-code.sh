@@ -35,11 +35,7 @@ Question() {
   whichVal=''
   while [ -z "$whichVal" ]; do
     for p in $3; do
-      # sort the function from the list
-      # show the reference functions that relates to the projec name and it's not the auth function
-      # otherwise it possible users update the wrong code
-      # or they possible even mess up the auth function
-      if [[ "$p" != *${projectName}* ]] || [[ "$p" == *${projectName}_authfunc* ]] ; then
+      if [[ "$p" != *${projectName}* ]] ; then
         continue
       fi
       p=$(echo "$p" | sed "s/\"//g")
