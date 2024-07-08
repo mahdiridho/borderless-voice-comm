@@ -1,7 +1,7 @@
 {
   "name": "commai",
   "version": "1.0.0",
-  "description": "Realtime cross-language communicator with AWS Transcribe and Bedrock",
+  "description": "Cross-language communicator with AWS Transcribe and Bedrock",
   "main": "index.js",
   "scripts": {
     "start": "vite --port 8081 --open /",
