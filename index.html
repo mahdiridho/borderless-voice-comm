@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Blurb Communicator</title>
+  <style>
+    #container, #opponent {
+      display: none;
+    }
+    #opponentTxt {
+      width: 100vw;
+      text-align: center;
+      margin-top: 50px;
+    }
+  </style>
+</head>
+
+<body>
+  <select id="native">
+    <option value="">-- Native Language --</option>
+    <option value="id-ID">Indonesia</option>
+    <option value="hi-IN">Hindi</option>
+    <option value="fr-FR">French</option>
+    <option value="en-US">English</option>
+  </select>
+  <select id="opponent">
+    <option value="">-- Opponent Language --</option>
+    <option value="hi-IN">Hindi</option>
+    <option value="fr-FR">French</option>
+    <option value="en-US">English</option>
+    <option value="id-ID">Indonesia</option>
+  </select>
+  <div id="container">
+    <button id="talk">Talk</button>
+    <audio>
+      <source class="track" src="" type="audio/mpeg">
+    </audio>
+    <div id="transcription"></div>
+    <hr>
+    <div><button id="logout">Logout</button></div>
+  </div>
+  <h2 id="opponentTxt"></h2>
+  <script type="module" src="./index.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,36 @@
+{
+  "name": "commai",
+  "version": "1.0.0",
+  "description": "Realtime cross-language communicator with AWS Transcribe and Bedrock",
+  "main": "index.js",
+  "scripts": {
+    "start": "vite --port 8081 --open /",
+    "start:build": "vite dist --port 8081 --open /",
+    "build": "vite build; cp recorder-worklet.js RecorderPCM* dist"
+  },
+  "keywords": [
+    "aws",
+    "serverless",
+    "transcribe",
+    "bedrock",
+    "getai"
+  ],
+  "author": "Mahdi Ridho",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity": "^3.600.0",
+    "@aws-sdk/client-lambda": "^3.600.0",
+    "@aws-sdk/client-polly": "^3.596.0",
+    "@aws-sdk/client-s3": "^3.596.0",
+    "@aws-sdk/client-sqs": "^3.600.0",
+    "@aws-sdk/client-transcribe": "^3.596.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.596.0",
+    "@aws-sdk/credential-provider-cognito-identity": "^3.600.0",
+    "buffer": "^6.0.3",
+    "microphone-stream": "^6.0.1"
+  },
+  "devDependencies": {
+    "vite": "^5.2.11",
+    "vite-plugin-node-polyfills": "^0.22.0"
+  }
+}
