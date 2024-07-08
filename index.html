@@ -1,47 +1,35 @@
 <!DOCTYPE html>
-<html>
 
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta name="description" content="Borderless Voice Communicator">
+  <meta name="theme-color" content="#ffffff">
   <title>Blurb Communicator</title>
-  <style>
-    #container, #opponent {
-      display: none;
-    }
-    #opponentTxt {
-      width: 100vw;
-      text-align: center;
-      margin-top: 50px;
-    }
-  </style>
-</head>
 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css?family=Material+Icons&display=block" rel="stylesheet">
+</head>
 <body>
-  <select id="native">
-    <option value="">-- Native Language --</option>
-    <option value="id-ID">Indonesia</option>
-    <option value="hi-IN">Hindi</option>
-    <option value="fr-FR">French</option>
-    <option value="en-US">English</option>
-  </select>
-  <select id="opponent">
-    <option value="">-- Opponent Language --</option>
-    <option value="hi-IN">Hindi</option>
-    <option value="fr-FR">French</option>
-    <option value="en-US">English</option>
-    <option value="id-ID">Indonesia</option>
-  </select>
-  <div id="container">
-    <button id="talk">Talk</button>
-    <audio>
-      <source class="track" src="" type="audio/mpeg">
-    </audio>
-    <div id="transcription"></div>
-    <hr>
-    <div><button id="logout">Logout</button></div>
-  </div>
-  <h2 id="opponentTxt"></h2>
-  <script type="module" src="./index.js"></script>
+  <sp-theme color="light" scale="medium">
+    <div id="demo"></div>
+  </sp-theme>
+
+  <script type="module">
+    import { html, render } from 'lit-html';
+    import '@spectrum-web-components/theme/sp-theme';
+    import '@spectrum-web-components/theme/theme-light';
+    import '@spectrum-web-components/theme/scale-medium';
+    import './src/comm-ai.js';
+
+    render(
+      html`
+        <comm-ai></comm-ai>
+      `,
+      document.querySelector('#demo')
+    );
+  </script>
 </body>
 
 </html>

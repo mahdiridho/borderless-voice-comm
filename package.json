@@ -1,12 +1,12 @@
 {
   "name": "commai",
   "version": "1.0.0",
-  "description": "Cross-language communicator with AWS Transcribe and Bedrock",
+  "description": "Borderless Voice Communicator",
   "main": "index.js",
   "scripts": {
     "start": "vite --port 8081 --open /",
     "start:build": "vite dist --port 8081 --open /",
-    "build": "vite build; cp recorder-worklet.js RecorderPCM* dist"
+    "build": "vite build; cp -rf images recorder-worklet.js RecorderPCM* dist"
   },
   "keywords": [
     "aws",
@@ -26,7 +26,15 @@
     "@aws-sdk/client-transcribe": "^3.596.0",
     "@aws-sdk/client-transcribe-streaming": "^3.596.0",
     "@aws-sdk/credential-provider-cognito-identity": "^3.600.0",
-    "buffer": "^6.0.3",
+    "@collaborne/lit-flexbox-literals": "^0.2.2",
+    "@material/mwc-button": "^0.22.0",
+    "@material/mwc-circular-progress": "^0.22.0",
+    "@material/mwc-icon-button": "^0.22.0",
+    "@material/mwc-list": "^0.22.0",
+    "@material/mwc-select": "^0.22.0",
+    "@material/mwc-snackbar": "^0.22.0",
+    "@spectrum-web-components/theme": "^0.9.0",
+    "lit": "^2.0.2",
     "microphone-stream": "^6.0.1"
   },
   "devDependencies": {
