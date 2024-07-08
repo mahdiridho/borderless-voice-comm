@@ -1,6 +1,15 @@
 # borderless-voice-comm
 Cross-language communicator with AWS Transcribe and Bedrock
 
+High level architecture:
+
+![alt text](https://github.com/mahdiridho/borderless-voice-comm/blob/master/images/Voice-Comm.jpg?raw=true)
+
+Full design:
+
+![alt text](https://github.com/mahdiridho/borderless-voice-comm/blob/master/images/Full-Arch-Voice-Comm.jpg?raw=true)
+
+
 # Prerequisites
 1. Cognito Identity Pool with Guest (Unauthenticated) IAM Role
 2. Set the IAM Role policies for both guest and lambda (see the files client-policies.json & backend-policies.json)
