@@ -1,0 +1,6 @@
+{
+    "profile": "<CRED_PROFILE>",
+    "region": "<AWS_REGION>",
+    "profileId": "<AWS_ACCOUNT_ID>",
+    "projectName": "<LAMBDA_FUNC_NAME>"
+}

@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "build": "esbuild function.js --bundle --outfile=build/index.js --platform=node"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.602.0",
+    "@aws-sdk/client-sqs": "^3.600.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.1"
+  },
+  "type": "module"
+}
