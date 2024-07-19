@@ -67,9 +67,7 @@ const encodePCMChunk = (chunk) => {
 
 const getAudioStream = async function* () {
   for await (const chunk of microphoneStream) {
-    console.log(chunk.length)
     if (chunk.length <= SAMPLE_RATE) {
-      console.log("AA")
       yield {
         AudioEvent: {
           AudioChunk: encodePCMChunk(chunk),
@@ -160,15 +158,17 @@ const audioBufferToWav = function (audioBuffer) {
 class CommAi extends LitElement {
   static get properties() {
     return {
-      viewTxt: { type: String },
+      sendTxt: { type: String },
+      receiveTxt: { type: String },
       nativeLang: { type: String },
-      opponentLang: { type: String }
+      opponentLang: { type: String },
+      transcript: { type: String }
     };
   }
 
   constructor() {
     super();
-    this.viewTxt = "Hi mate, Welcome to Generative AI Tour 2024! Tell me, what's your preference languages please?";
+    this.sendTxt = "Hi mate, Welcome to Generative AI Tour 2024! Tell me, what's your preference languages please?";
   }
 
   static get styles() {
@@ -191,14 +191,23 @@ class CommAi extends LitElement {
       #startUI {
         display: none;
       }
-      #question {
+      #sendMsg {
         font-weight: bold;
         font-size: 20px;
+      }
+      #receiveMsg {
+        font-weight: bold;
+        font-size: 20px;
+        font-style: italic;
+        color: blue;
       }
       mwc-button#confirm {
         display: none;
       }
       mwc-button#talk {
+        display: none;
+      }
+      mwc-button#send {
         display: none;
       }
       #nativeLang {
@@ -230,7 +239,7 @@ class CommAi extends LitElement {
       <div class="layout horizontal flex">
         <mwc-button id="startUI" raised @click="${this.startUI}">Start</mwc-button>
         <div class="layout vertical">
-          <div id="question"></div>
+          <div id="sendMsg"></div>
           <mwc-select id="nativeLang" label="Native Language">
             <mwc-list-item value="id-ID">Indonesia</mwc-list-item>
             <mwc-list-item value="hi-IN">Hindi</mwc-list-item>
@@ -245,7 +254,9 @@ class CommAi extends LitElement {
           </mwc-select>
           <mwc-button id="confirm" raised @click="${this.confirmLang}">Confirm</mwc-button>
           <img id="mic" src="https://media2.giphy.com/media/U2XyutfhyThfvhMKMH/giphy.gif?cid=6c09b9528t9btpweetnwqc1p2i94gh8nnqhpkx9his6k64fs&ep=v1_internal_gif_by_id&rid=giphy.gif&ct=s">
-          <mwc-button id="talk" raised @click="${this.talkSend}">Talk</mwc-button>
+          <mwc-button id="talk" raised @click="${this.talkCmd}">Talk</mwc-button>
+          <mwc-button id="send" raised @click="${this.sendCmd}">Send</mwc-button>
+          <div id="receiveMsg"></div>
         </div>
         <mwc-circular-progress indeterminate closed=true></mwc-circular-progress>
       </div>
@@ -258,8 +269,12 @@ class CommAi extends LitElement {
     `;
   }
 
-  get viewTxtElm() {
-    return this.shadowRoot.getElementById("question");
+  get sendTxtElm() {
+    return this.shadowRoot.getElementById("sendMsg");
+  }
+
+  get receiveTxtElm() {
+    return this.shadowRoot.getElementById("receiveMsg");
   }
 
   get audioElm() {
@@ -276,6 +291,10 @@ class CommAi extends LitElement {
 
   get talkBtn() {
     return this.shadowRoot.getElementById("talk");
+  }
+
+  get sendBtn() {
+    return this.shadowRoot.getElementById("send");
   }
 
   get nativeSelect() {
@@ -343,9 +362,9 @@ class CommAi extends LitElement {
   startUI() {
     this.waitElm.open();
     this.shadowRoot.getElementById("startUI").style.display = "none";
-    this.startSpeech(this.viewTxt, "Joanna").then(() => {
+    this.startSpeech(this.sendTxt, "Joanna").then(() => {
       this.waitElm.close();
-      this.viewTxtElm.innerHTML = this.viewTxt;
+      this.sendTxtElm.innerHTML = this.sendTxt;
       this.nativeSelect.style.display = "block";
       this.opponentSelect.style.display = "block";
       this.confirmBtn.style.display = "block";
@@ -403,13 +422,13 @@ class CommAi extends LitElement {
       this.nativeSelect.style.display = "none";
       this.opponentSelect.style.display = "none";
       this.confirmBtn.style.display = "none";
-      this.viewTxtElm.innerHTML = "";
-      this.viewTxt = "Yeay, setup done! Now, You are ready to talk with friend.";
-      this.startSpeech(this.viewTxt, "Joanna").then(() => {
+      this.sendTxtElm.innerHTML = "";
+      this.sendTxt = "Yeay, setup done! Now, You are ready to talk with friend.";
+      this.startSpeech(this.sendTxt, "Joanna").then(() => {
         this.waitElm.close();
-        this.viewTxtElm.innerHTML = this.viewTxt;
+        this.sendTxtElm.innerHTML = this.sendTxt;
         setTimeout(() => {
-          this.viewTxtElm.innerHTML = "";
+          this.sendTxtElm.innerHTML = "";
           this.talkBtn.style.display = "block";
           this.receiveMsg();
         }, 4500)
@@ -423,18 +442,19 @@ class CommAi extends LitElement {
           let ab = audioBufferToWav(audioBuffer);
           const audioBlob = new Blob([ab], { type: 'audio/wav' });
 
-          await s3Client.send(new PutObjectCommand({
-            Bucket: BATCH_BUCKET,
-            Key: "idID.wav",
-            Body: audioBlob,
-            ContentType: 'audio/wav'
-          }))
-
-          await transcribeClient.send(new DeleteTranscriptionJobCommand({
-            TranscriptionJobName: "indonesia"
-          })).catch(e => {
-            console.log(e.message)
-          })
+          await Promise.all([
+            s3Client.send(new PutObjectCommand({
+              Bucket: BATCH_BUCKET,
+              Key: "idID.wav",
+              Body: audioBlob,
+              ContentType: 'audio/wav'
+            })),
+            transcribeClient.send(new DeleteTranscriptionJobCommand({
+              TranscriptionJobName: "indonesia"
+            })).catch(e => {
+              console.log(e.message)
+            })
+          ]);
 
           await transcribeClient.send(new StartTranscriptionJobCommand({
             TranscriptionJobName: "indonesia",
@@ -455,7 +475,7 @@ class CommAi extends LitElement {
             const j = await obj.Body.transformToString()
             const text = JSON.parse(j).results.transcripts[0].transcript
             this.translateTo(text);
-            this.viewTxtElm.innerHTML = this.viewTxt = `Send: ${text}`;
+            this.sendTxtElm.innerHTML = this.sendTxt = `You: ${text}`;
             this.talkBtn.style.display = "block";
             this.waitElm.close();
           }
@@ -471,27 +491,36 @@ class CommAi extends LitElement {
     }
   }
 
-  talkSend() {
-    this.viewTxtElm.innerHTML = this.viewTxt = "";
+  talkCmd() {
+    this.transcript = "";
+    this.sendTxtElm.innerHTML = this.sendTxt = "";
     this.talkBtn.style.display = "none";
+    this.sendBtn.style.display = "block";
     if (this.nativeLang === "id-ID") {
       recorder.start();
-      this.startRecording(() => {
-        recorder.stop()
-        this.stopRecording();
-        this.waitElm.open();
-      })
+      this.startRecording(() => {});
     } else {
       this.startRecording((text) => {
-        this.stopTalk(text);
+        this.transcript += text;
+        this.sendTxtElm.innerHTML = this.sendTxt = `You: ${this.transcript}`;
       })
+    }
+  }
+
+  sendCmd() {
+    this.sendBtn.style.display = "none";
+    if (this.nativeLang === "id-ID") {
+      recorder.stop()
+      this.stopRecording();
+      this.waitElm.open();
+    } else {
+      this.stopTalk(this.transcript);
     }
   }
 
   stopTalk(text) {
     this.stopRecording();
     this.translateTo(text);
-    this.viewTxtElm.innerHTML = this.viewTxt = `Send: ${text}`;
     this.talkBtn.style.display = "block";
   }
 
@@ -505,7 +534,7 @@ class CommAi extends LitElement {
   };
 
   async stopRecording() {
-    this.viewTxtElm.innerHTML = this.viewTxt = "";
+    this.sendTxtElm.innerHTML = this.sendTxt = "";
     this.micImg.style.display = "none";
     if (microphoneStream) {
       microphoneStream.stop();
@@ -546,23 +575,18 @@ class CommAi extends LitElement {
         VisibilityTimeout: 0,
         WaitTimeSeconds
       }))
-      console.log(message)
 
       if (message?.Messages?.length > 0) {
-        this.waitElm.open();
-        this.stopRecording();
         const sqsBody = JSON.parse(message.Messages[0].Body);
-        this.viewTxt = JSON.parse(base64ToUtf8(sqsBody.msg)).text;
+        this.receiveTxt = JSON.parse(base64ToUtf8(sqsBody.msg)).text;
         console.log("Clean up the message")
         await Promise.all([
           sqsClient.send(new DeleteMessageCommand({
             QueueUrl: `${QUEUE_URL}-${this.nativeLang}`,
             ReceiptHandle: message.Messages[0].ReceiptHandle
           })),
-          this.startSpeech(this.viewTxt, voices[this.nativeLang]).then(() => {
-            this.viewTxtElm.innerHTML = `Receive: ${this.viewTxt}`;
-            this.waitElm.close();
-            this.talkBtn.style.display = "block";
+          this.startSpeech(this.receiveTxt, voices[this.nativeLang]).then(() => {
+            this.receiveTxtElm.innerHTML = `Folk: ${this.receiveTxt}`;
           })
         ]);
       }
