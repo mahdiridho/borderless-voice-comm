@@ -32,3 +32,6 @@ Full design:
 
 # Publish static apps
 Just run the command ```./awsSetup.sh```
+
+# Demo
+[Blurb Communicator](https://dwb75hpa77xa8.cloudfront.net/)
