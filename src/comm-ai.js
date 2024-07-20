@@ -7,15 +7,15 @@ import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand } from "@aws-sdk/client-sqs";
 import { Buffer } from "buffer";
-import { RecorderPCM } from '../RecorderPCM'; // using the audio worklet
-import { RecorderPCMSPN } from '../RecorderPCMScriptNode'; // using the script processor node
+import { RecorderPCM } from "../RecorderPCM"; // using the audio worklet
+import { RecorderPCMSPN } from "../RecorderPCMScriptNode"; // using the script processor node
 import MicrophoneStream from "microphone-stream";
 
-const AWS_REGION = "<AWS_REGION>";
-const QUEUE_URL = "<QUEUE_URL>";
-const FUNCTION_NAME = "<FUNCTION_NAME>";
-const IDENTITY_POOL = "<IDEDNTITY_POOL_ID>";
-const BATCH_BUCKET = "<S3_BATCH_BUCKET>";
+const AWS_REGION = import.meta.env.VITE_AWS_REGION;
+const QUEUE_URL = import.meta.env.VITE_QUEUE_URL;
+const FUNCTION_NAME = import.meta.env.VITE_FUNCTION_NAME;
+const IDENTITY_POOL = import.meta.env.VITE_IDENTITY_POOL;
+const BATCH_BUCKET = import.meta.env.VITE_BATCH_BUCKET;
 
 const SAMPLE_RATE = 48000;
 const voices = {
@@ -461,7 +461,7 @@ class CommAi extends LitElement {
             LanguageCode: "id-ID",
             MediaFormat: "wav",
             Media: {
-              MediaFileUri: "https://BATCH_BUCKET.s3-<AWS_REGION>.amazonaws.com/idID.wav",
+              MediaFileUri: `https://${BATCH_BUCKET}.s3-${AWS_REGION}.amazonaws.com/idID.wav`,
             },
             OutputBucketName: BATCH_BUCKET
           }));

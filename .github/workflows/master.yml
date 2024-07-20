@@ -7,6 +7,12 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      VITE_AWS_REGION: ${{ secrets.AWS_REGION }}
+      VITE_QUEUE_URL: ${{ secrets.QUEUE_URL }}
+      VITE_FUNCTION_NAME: ${{ secrets.FUNCTION_NAME }}
+      VITE_IDENTITY_POOL: ${{ secrets.IDENTITY_POOL_ID }}
+      VITE_BATCH_BUCKET: ${{ secrets.S3_BATCH_BUCKET }}
 
     steps:
       - uses: actions/checkout@v1
@@ -29,10 +35,5 @@ jobs:
           npm run build
           pushd dist
           aws s3 sync . s3://audioctxai.com --delete --sse AES256 --cache-control no-cache
+          popd
           rm -rf node_modules package-log.json dist
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          QUEUE_URL: ${{ secrets.QUEUE_URL }}
-          FUNCTION_NAME: ${{ secrets.FUNCTION_NAME }}
-          IDENTITY_POOL: ${{ secrets.IDENTITY_POOL }}
-          BATCH_BUCKET: ${{ secrets.BATCH_BUCKET }}
