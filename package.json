@@ -15,6 +15,7 @@
     "bedrock",
     "getai"
   ],
+  "homepage": "https://mahdiridho.github.io/borderless-voice-comm/",
   "author": "Mahdi Ridho",
   "license": "ISC",
   "dependencies": {

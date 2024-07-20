@@ -1,0 +1,38 @@
+name: Deploy to AWS S3
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Install and Build
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: Deploy static site to S3 bucket
+        run: |
+          npm install
+          npm run build
+          pushd dist
+          aws s3 sync . s3://audioctxai.com --delete --sse AES256 --cache-control no-cache
+          rm -rf node_modules package-log.json dist
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          QUEUE_URL: ${{ secrets.QUEUE_URL }}
+          FUNCTION_NAME: ${{ secrets.FUNCTION_NAME }}
+          IDENTITY_POOL: ${{ secrets.IDENTITY_POOL }}
+          BATCH_BUCKET: ${{ secrets.BATCH_BUCKET }}
