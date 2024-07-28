@@ -12,7 +12,6 @@ jobs:
       VITE_QUEUE_URL: ${{ secrets.QUEUE_URL }}
       VITE_FUNCTION_NAME: ${{ secrets.FUNCTION_NAME }}
       VITE_IDENTITY_POOL: ${{ secrets.IDENTITY_POOL_ID }}
-      VITE_BATCH_BUCKET: ${{ secrets.S3_BATCH_BUCKET }}
 
     steps:
       - uses: actions/checkout@v1
