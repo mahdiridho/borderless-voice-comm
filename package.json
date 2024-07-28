@@ -6,7 +6,7 @@
   "scripts": {
     "start": "vite --port 8081 --open /",
     "start:build": "vite dist --port 8081 --open /",
-    "build": "vite build; cp -rf images recorder-worklet.js RecorderPCM* dist"
+    "build": "vite build; cp -rf images dist"
   },
   "keywords": [
     "aws",
