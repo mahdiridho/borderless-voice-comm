@@ -4,7 +4,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.602.0",
-    "@aws-sdk/client-sqs": "^3.600.0"
+    "@aws-sdk/client-sqs": "^3.600.0",
+    "axios": "^1.7.2",
+    "form-data": "^4.0.0"
   },
   "devDependencies": {
     "esbuild": "^0.21.1"

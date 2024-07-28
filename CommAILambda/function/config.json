@@ -2,5 +2,10 @@
     "profile": "<CRED_PROFILE>",
     "region": "<AWS_REGION>",
     "profileId": "<AWS_ACCOUNT_ID>",
-    "projectName": "<LAMBDA_FUNC_NAME>"
+    "projectName": "<LAMBDA_FUNC_NAME>",
+    "queueUrl": "<QUEUE_URL", // i.e: https://sqs.us-east-1.amazonaws.com/awsId/queueName
+    "aiModel": "cohere.command-r-plus-v1:0",
+    "openaiKey": "<OPEN_AI_KEY>", // sk-proj-xxxxxxx"
+    "openaiUrl": "https://api.openai.com/v1/audio/transcriptions",
+    "openaiModel": "whisper-1"
 }
