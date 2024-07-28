@@ -3,11 +3,11 @@ Cross-language communicator with AWS Transcribe and Bedrock
 
 High level architecture:
 
-![alt text](https://github.com/mahdiridho/borderless-voice-comm/blob/master/images/Voice-Comm.jpg?raw=true)
+![alt text](https://github.com/mahdiridho/borderless-voice-comm/blob/master/images/Voice-CommV2.jpg?raw=true&ver=2)
 
 Full design:
 
-![alt text](https://github.com/mahdiridho/borderless-voice-comm/blob/master/images/Full-Arch-Voice-Comm.jpg?raw=true)
+![alt text](https://github.com/mahdiridho/borderless-voice-comm/blob/master/images/Full-Arch-Voice-CommV2.jpg?raw=true&ver=2)
 
 
 # Prerequisites
