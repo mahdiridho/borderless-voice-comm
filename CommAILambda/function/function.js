@@ -27,6 +27,8 @@ export const handler = async (event) => {
     const formData = new FormData();
     formData.append("file", audioBlob, "audio.wav");
     formData.append("model", config.openaiModel);
+    formData.append("response_format", "verbose_json");
+    formData.append("timestamp_granularities", "['word']");
     const openAiRes = await axios.post(config.openaiUrl, formData, {
       headers
     });
