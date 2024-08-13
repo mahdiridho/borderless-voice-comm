@@ -1,5 +1,5 @@
 # borderless-voice-comm
-Cross-language communicator with AWS Transcribe and Bedrock
+Cross-language communicator with OpenAI Whisper and Bedrock
 
 High level architecture:
 
