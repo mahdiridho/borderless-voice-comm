@@ -83,8 +83,9 @@ class CommAi extends LitElement {
         width: 95vw;
         height: 95vh;
       }
-      img#sg2024 {
-        height: 95vh;
+      #wrapper {
+        width: 100%;
+        height: 100%;
       }
       img#mic {
         height: 30vh;
@@ -116,26 +117,23 @@ class CommAi extends LitElement {
 
   render() {
     return html`
-    <div class="layout horizontal flex wrap center">
-      <div><img id="sg2024" src="../images/SG2024.jpg"></div>
-      <div class="layout horizontal flex">
-        <div class="layout vertical">
-          <div id="sendMsg"></div>
-          <mwc-textfield id="myName" placeholder="Nickname"></mwc-textfield>
-          <mwc-select id="nativeLang" label="Native Language">
-            <mwc-list-item value="id-ID">Indonesia</mwc-list-item>
-            <mwc-list-item value="hi-IN">Hindi</mwc-list-item>
-            <mwc-list-item value="fr-FR">French</mwc-list-item>
-            <mwc-list-item value="en-US">English</mwc-list-item>
-          </mwc-select>
-          <mwc-button id="confirm" raised @click="${this.confirmProfile}" label='Confirm'></mwc-button>
-          <img id="mic" src="https://media2.giphy.com/media/U2XyutfhyThfvhMKMH/giphy.gif?cid=6c09b9528t9btpweetnwqc1p2i94gh8nnqhpkx9his6k64fs&ep=v1_internal_gif_by_id&rid=giphy.gif&ct=s">
-          <mwc-button id="talk" raised @click="${this.talkCmd}" label='Talk'></mwc-button>
-          <mwc-button id="send" raised @click="${this.sendCmd}" label='Send'></mwc-button>
-          <div id="receiveMsg"></div>
-        </div>
-        <mwc-circular-progress indeterminate closed=true></mwc-circular-progress>
+    <div id="wrapper" class="layout horizontal flex center-center center">
+      <div class="layout vertical">
+        <div id="sendMsg"></div>
+        <mwc-textfield id="myName" placeholder="Nickname"></mwc-textfield>
+        <mwc-select id="nativeLang" label="Native Language">
+          <mwc-list-item value="id-ID">Indonesia</mwc-list-item>
+          <mwc-list-item value="hi-IN">Hindi</mwc-list-item>
+          <mwc-list-item value="fr-FR">French</mwc-list-item>
+          <mwc-list-item value="en-US">English</mwc-list-item>
+        </mwc-select>
+        <mwc-button id="confirm" raised @click="${this.confirmProfile}" label='Confirm'></mwc-button>
+        <img id="mic" src="https://media2.giphy.com/media/U2XyutfhyThfvhMKMH/giphy.gif?cid=6c09b9528t9btpweetnwqc1p2i94gh8nnqhpkx9his6k64fs&ep=v1_internal_gif_by_id&rid=giphy.gif&ct=s">
+        <mwc-button id="talk" raised @click="${this.talkCmd}" label='Talk'></mwc-button>
+        <mwc-button id="send" raised @click="${this.sendCmd}" label='Send'></mwc-button>
+        <div id="receiveMsg"></div>
       </div>
+      <mwc-circular-progress indeterminate closed=true></mwc-circular-progress>
     </div>
     <audio>
       <source class="track" src="" type="audio/mpeg">
