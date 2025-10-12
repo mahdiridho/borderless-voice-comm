@@ -25,8 +25,7 @@ on:
         default: false
 
 env:
-  NODE_VERSION: 22
-  STACK_NAME: BorderlessVoiceCommStack
+  NODE_VERSION: 20
 
 jobs:
   deploy-infrastructure:
