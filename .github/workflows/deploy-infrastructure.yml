@@ -54,6 +54,14 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: 🏗️ Set up QEMU for ARM64
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      
       # Configure AWS credentials (uses OIDC if AWS_ROLE_TO_ASSUME is set, otherwise access keys)
       - name: 🔐 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
