@@ -1,0 +1,340 @@
+name: Deploy CDK Infrastructure
+
+on:
+  push:
+    branches:
+      - master
+      - feature/*
+    paths:
+      - 'infrastructure/**'
+      - '.github/workflows/deploy-infrastructure.yml'
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: 'Destroy stack instead of deploying'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: 22
+  STACK_NAME: BorderlessVoiceCommStack
+
+jobs:
+  deploy-infrastructure:
+    name: Deploy CDK Stack
+    runs-on: ubuntu-latest
+    
+    # Set up permissions for OIDC if using AWS IAM OIDC (recommended)
+    permissions:
+      id-token: write
+      contents: read
+    
+    outputs:
+      appsync-api-id: ${{ steps.stack-outputs.outputs.appsync-api-id }}
+      appsync-api-key: ${{ steps.stack-outputs.outputs.appsync-api-key }}
+      audio-processor-url: ${{ steps.stack-outputs.outputs.audio-processor-url }}
+      tts-handler-url: ${{ steps.stack-outputs.outputs.tts-handler-url }}
+      kvs-channel-arn: ${{ steps.stack-outputs.outputs.kvs-channel-arn }}
+      kvs-channel-name: ${{ steps.stack-outputs.outputs.kvs-channel-name }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: infrastructure/package-lock.json
+      
+      # Configure AWS credentials using OIDC
+      - name: 🔐 Configure AWS Credentials (OIDC)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: github-actions-cdk-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: ✅ Verify AWS credentials
+        run: |
+          aws sts get-caller-identity
+          echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"
+      
+      - name: 📦 Install CDK dependencies
+        working-directory: infrastructure
+        run: npm ci
+      
+      - name: 🔨 Build CDK project
+        working-directory: infrastructure
+        run: npm run build
+      
+      - name: 🔍 CDK Diff (show changes)
+        working-directory: infrastructure
+        run: npx cdk diff
+        continue-on-error: true
+      
+      - name: 🎯 Bootstrap CDK (if needed)
+        working-directory: infrastructure
+        run: |
+          echo "Checking if CDK bootstrap is needed..."
+          npx cdk bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ env.AWS_REGION }} || true
+      
+      - name: 🚀 Deploy CDK Stack
+        if: ${{ !inputs.destroy }}
+        working-directory: infrastructure
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          echo "Deploying CDK stack..."
+          npx cdk deploy --require-approval never --outputs-file outputs.json
+      
+      - name: 💾 Upload CDK Outputs
+        if: ${{ !inputs.destroy }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdk-outputs
+          path: infrastructure/outputs.json
+          retention-days: 30
+      
+      - name: 📋 Parse Stack Outputs
+        if: ${{ !inputs.destroy }}
+        id: stack-outputs
+        working-directory: infrastructure
+        run: |
+          if [ -f outputs.json ]; then
+            echo "Parsing CDK outputs..."
+            STACK_OUTPUT=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack // {}')
+            
+            echo "appsync-api-id=$(echo $STACK_OUTPUT | jq -r '.AppSyncEventsApiId // ""')" >> $GITHUB_OUTPUT
+            echo "appsync-api-key=$(echo $STACK_OUTPUT | jq -r '.AppSyncApiKey // ""')" >> $GITHUB_OUTPUT
+            echo "audio-processor-url=$(echo $STACK_OUTPUT | jq -r '.AudioProcessorUrl // ""')" >> $GITHUB_OUTPUT
+            echo "tts-handler-url=$(echo $STACK_OUTPUT | jq -r '.TTSHandlerUrl // ""')" >> $GITHUB_OUTPUT
+            echo "kvs-channel-arn=$(echo $STACK_OUTPUT | jq -r '.KVSSignalingChannelARN // ""')" >> $GITHUB_OUTPUT
+            echo "kvs-channel-name=$(echo $STACK_OUTPUT | jq -r '.KVSSignalingChannelName // ""')" >> $GITHUB_OUTPUT
+            
+            echo "✅ Stack outputs extracted successfully"
+          else
+            echo "⚠️ No outputs.json found"
+          fi
+      
+      - name: 🗑️ Destroy CDK Stack
+        if: ${{ inputs.destroy }}
+        working-directory: infrastructure
+        run: |
+          echo "Destroying CDK stack..."
+          npx cdk destroy --force
+      
+      - name: 📊 Display Deployment Summary
+        if: ${{ !inputs.destroy }}
+        run: |
+          echo "## 🎉 CDK Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| AppSync API ID | \`${{ steps.stack-outputs.outputs.appsync-api-id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| KVS Channel ARN | \`${{ steps.stack-outputs.outputs.kvs-channel-arn }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| KVS Channel Name | \`${{ steps.stack-outputs.outputs.kvs-channel-name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📝 Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Create Cognito Identity Pool" >> $GITHUB_STEP_SUMMARY
+          echo "2. Update \`.env.local\` with these values" >> $GITHUB_STEP_SUMMARY
+          echo "3. Deploy the client application" >> $GITHUB_STEP_SUMMARY
+
+  setup-cognito:
+    name: Setup Cognito Identity Pool
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.destroy }}
+    
+    outputs:
+      identity-pool-id: ${{ steps.create-pool.outputs.identity-pool-id }}
+    
+    steps:
+      - name: 🔐 Configure AWS Credentials (OIDC)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: github-actions-cognito-setup
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: 🆔 Create or Get Cognito Identity Pool
+        id: create-pool
+        run: |
+          POOL_NAME="borderless-voice-comm"
+          
+          # Check if pool already exists
+          EXISTING_POOL=$(aws cognito-identity list-identity-pools --max-results 60 \
+            --query "IdentityPools[?IdentityPoolName=='$POOL_NAME'].IdentityPoolId" \
+            --output text)
+          
+          if [ ! -z "$EXISTING_POOL" ]; then
+            echo "✅ Cognito Identity Pool already exists: $EXISTING_POOL"
+            echo "identity-pool-id=$EXISTING_POOL" >> $GITHUB_OUTPUT
+          else
+            echo "Creating new Cognito Identity Pool..."
+            POOL_ID=$(aws cognito-identity create-identity-pool \
+              --identity-pool-name "$POOL_NAME" \
+              --allow-unauthenticated-identities \
+              --query 'IdentityPoolId' \
+              --output text)
+            
+            echo "✅ Created Cognito Identity Pool: $POOL_ID"
+            echo "identity-pool-id=$POOL_ID" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: 🔧 Setup IAM Role for Unauthenticated Access
+        run: |
+          POOL_ID="${{ steps.create-pool.outputs.identity-pool-id }}"
+          ROLE_NAME="Cognito_BorderlessVoiceCommUnauth_Role"
+          
+          # Check if role exists
+          if aws iam get-role --role-name "$ROLE_NAME" 2>/dev/null; then
+            echo "✅ IAM Role already exists: $ROLE_NAME"
+          else
+            echo "Creating IAM Role for unauthenticated access..."
+            
+            # Create trust policy
+            cat > trust-policy.json <<EOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Federated": "cognito-identity.amazonaws.com"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringEquals": {
+                    "cognito-identity.amazonaws.com:aud": "$POOL_ID"
+                  },
+                  "ForAnyValue:StringLike": {
+                    "cognito-identity.amazonaws.com:amr": "unauthenticated"
+                  }
+                }
+              }
+            ]
+          }
+          EOF
+            
+            # Create role
+            ROLE_ARN=$(aws iam create-role \
+              --role-name "$ROLE_NAME" \
+              --assume-role-policy-document file://trust-policy.json \
+              --query 'Role.Arn' \
+              --output text)
+            
+            echo "✅ Created IAM Role: $ROLE_ARN"
+            
+            # Create KVS permissions policy
+            cat > kvs-policy.json <<EOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "kinesisvideo:DescribeSignalingChannel",
+                  "kinesisvideo:GetSignalingChannelEndpoint",
+                  "kinesisvideo:GetIceServerConfig"
+                ],
+                "Resource": "${{ needs.deploy-infrastructure.outputs.kvs-channel-arn }}"
+              }
+            ]
+          }
+          EOF
+            
+            # Attach policy
+            aws iam put-role-policy \
+              --role-name "$ROLE_NAME" \
+              --policy-name "KVSWebRTCAccess" \
+              --policy-document file://kvs-policy.json
+            
+            echo "✅ Attached KVS permissions to role"
+            
+            # Attach identity pool to role
+            sleep 5  # Wait for role to be ready
+            aws cognito-identity set-identity-pool-roles \
+              --identity-pool-id "$POOL_ID" \
+              --roles unauthenticated="$ROLE_ARN"
+            
+            echo "✅ Associated role with Cognito Identity Pool"
+          fi
+      
+      - name: 📊 Display Cognito Summary
+        run: |
+          echo "## 🆔 Cognito Identity Pool Setup" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Identity Pool ID | \`${{ steps.create-pool.outputs.identity-pool-id }}\` |" >> $GITHUB_STEP_SUMMARY
+
+  deploy-client:
+    name: Build and Deploy Client
+    needs: [deploy-infrastructure, setup-cognito]
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.destroy && github.ref == 'refs/heads/master' }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci
+      
+      - name: 🔐 Configure AWS Credentials (OIDC)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: github-actions-cognito-setup
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: 📝 Create .env.local
+        run: |
+          cat > .env.local <<EOF
+          VITE_AWS_REGION=${{ env.AWS_REGION }}
+          VITE_IDENTITY_POOL_ID=${{ needs.setup-cognito.outputs.identity-pool-id }}
+          VITE_KVS_CHANNEL_ARN=${{ needs.deploy-infrastructure.outputs.kvs-channel-arn }}
+          VITE_KVS_CHANNEL_NAME=${{ needs.deploy-infrastructure.outputs.kvs-channel-name }}
+          VITE_APPSYNC_API_ID=${{ needs.deploy-infrastructure.outputs.appsync-api-id }}
+          VITE_APPSYNC_API_KEY=${{ needs.deploy-infrastructure.outputs.appsync-api-key }}
+          VITE_AUDIO_PROCESSOR_URL=${{ needs.deploy-infrastructure.outputs.audio-processor-url }}
+          VITE_TTS_HANDLER_URL=${{ needs.deploy-infrastructure.outputs.tts-handler-url }}
+          VITE_TRANSCRIPTION_CHANNEL=transcription-events
+          VITE_TRANSLATION_CHANNEL=translation-events
+          VITE_TTS_CHANNEL=tts-events
+          EOF
+          
+          echo "✅ Created .env.local file"
+      
+      - name: 🔨 Build client
+        run: npm run build
+      
+      - name: 📊 Display Build Summary
+        run: |
+          echo "## 🎨 Client Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Client built successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat .env.local >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+      
+      # Deploy to S3/CloudFront
+      - name: 🚀 Deploy to S3
+        run: |
+          aws s3 sync dist/ s3://${{ secrets.WEBAPP_BUCKET }} --delete
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.WEBAPP_CDN }} --paths "/*"
+
