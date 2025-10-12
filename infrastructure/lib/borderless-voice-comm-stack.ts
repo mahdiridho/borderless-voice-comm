@@ -177,7 +177,6 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
         APPSYNC_API_ENDPOINT: eventsApi.attrApiArn,
         TRANSCRIPTION_CHANNEL: transcriptionChannelName,
         TRANSLATION_CHANNEL: translationChannelName,
-        AWS_REGION: this.region,
       }
     });
 
@@ -205,7 +204,6 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
         APPSYNC_API_ID: eventsApi.attrApiId,
         APPSYNC_API_ENDPOINT: eventsApi.attrApiArn,
         TTS_CHANNEL: ttsChannelName,
-        AWS_REGION: this.region,
       }
     });
 
