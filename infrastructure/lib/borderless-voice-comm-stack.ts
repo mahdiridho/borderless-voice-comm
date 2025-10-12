@@ -1,12 +1,12 @@
 import * as cdk from 'aws-cdk-lib';
 import * as appsync from 'aws-cdk-lib/aws-appsync';
 import * as kinesisvideo from 'aws-cdk-lib/aws-kinesisvideo';
+import { NodejsFunction, BundlingOptions } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
-import * as path from 'path';
 
 export class BorderlessVoiceCommStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -135,15 +135,40 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
       resources: ['*'],
     }));
 
-    // Audio Processing Lambda - handles incoming audio, transcription, and translation
-    const audioProcessor = new lambda.Function(this, 'AudioProcessor', {
+
+    // Define bundling options for esbuild
+    const bundlingOptions: BundlingOptions = {
+      minify: true, // Minify code for production
+      sourceMap: true, // Include sourcemaps for easier debugging
+      target: 'node20', // Target Node.js version
+      forceDockerBundling: false,
+      nodeModules: [], // Bundle all node modules
+      esbuildArgs: {
+        '--tree-shaking': 'true',
+        '--minify-whitespace': 'true',
+        '--minify-identifiers': 'true',
+        '--minify-syntax': 'true'
+      }
+    };
+
+    const audioProcessorLogGroup = new logs.LogGroup(scope, 'VoiceCommAudioProcessorLogGroup', {
+      logGroupName: `/aws/lambda/borderless-voice-comm-audio-processor`,
+      retention: logs.RetentionDays.FIVE_DAYS,
+      removalPolicy: cdk.RemovalPolicy["DESTROY"]
+    });
+  
+    const audioProcessor = new NodejsFunction(scope, 'AudioProcessor', {
       functionName: `borderless-voice-comm-audio-processor`,
       runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64,
+      entry: './lambda/audio-processor/index.js',
       handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/audio-processor')),
+      bundling: bundlingOptions,
       role: lambdaRole,
       tracing: lambda.Tracing.ACTIVE,
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 1024,
+      logGroup: audioProcessorLogGroup, // Explicitly associate the log group
       environment: {
         SESSIONS_TABLE: sessionsTable.tableName,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
@@ -153,21 +178,27 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
         TRANSCRIPTION_CHANNEL: transcriptionChannelName,
         TRANSLATION_CHANNEL: translationChannelName,
         AWS_REGION: this.region,
-      },
-      timeout: cdk.Duration.seconds(60),
-      memorySize: 1024,
-      logRetention: logs.RetentionDays.ONE_WEEK,
+      }
     });
 
-    // Text-to-Speech Lambda - handles text-to-speech conversion
-    const ttsHandler = new lambda.Function(this, 'TTSHandler', {
+    const ttsHandlerLogGroup = new logs.LogGroup(scope, 'VoiceCommTTSHandlerLogGroup', {
+      logGroupName: `/aws/lambda/borderless-voice-comm-tts-handler`,
+      retention: logs.RetentionDays.FIVE_DAYS,
+      removalPolicy: cdk.RemovalPolicy["DESTROY"]
+    });
+
+    const ttsHandler = new NodejsFunction(scope, 'TTSHandler', {
       functionName: `borderless-voice-comm-tts-handler`,
       runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64,
+      entry: './lambda/tts-handler/index.js',
       handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/tts-handler')),
+      bundling: bundlingOptions,
       role: lambdaRole,
       tracing: lambda.Tracing.ACTIVE,
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+      logGroup: ttsHandlerLogGroup, // Explicitly associate the log group
       environment: {
         SESSIONS_TABLE: sessionsTable.tableName,
         POLLY_VOICE_ID: 'Joanna',
@@ -175,10 +206,7 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
         APPSYNC_API_ENDPOINT: eventsApi.attrApiArn,
         TTS_CHANNEL: ttsChannelName,
         AWS_REGION: this.region,
-      },
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 512,
-      logRetention: logs.RetentionDays.ONE_WEEK,
+      }
     });
 
     // Create Lambda Function URL for audio processing (allows client to invoke directly)
