@@ -241,7 +241,7 @@ jobs:
     name: Build and Deploy Client
     needs: deploy-infrastructure
     runs-on: ubuntu-latest
-    if: ${{ !inputs.skip_client_build && inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') && github.ref == 'refs/heads/master' }}
+    # if: ${{ !inputs.skip_client_build && inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') && github.ref == 'refs/heads/master' }}
     
     permissions:
       id-token: write
