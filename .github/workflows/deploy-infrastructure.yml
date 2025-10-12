@@ -71,12 +71,6 @@ jobs:
         working-directory: infrastructure
         run: npm run build
       
-      - name: 🔍 CDK Diff (show changes)
-        if: ${{ !inputs.force_deploy }}
-        working-directory: infrastructure
-        run: npx cdk diff
-        continue-on-error: true
-      
       - name: 🎯 Bootstrap CDK (if needed)
         working-directory: infrastructure
         run: |

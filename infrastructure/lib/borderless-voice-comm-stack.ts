@@ -151,13 +151,13 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
       }
     };
 
-    const audioProcessorLogGroup = new logs.LogGroup(scope, 'VoiceCommAudioProcessorLogGroup', {
+    const audioProcessorLogGroup = new logs.LogGroup(this, 'VoiceCommAudioProcessorLogGroup', {
       logGroupName: `/aws/lambda/borderless-voice-comm-audio-processor`,
       retention: logs.RetentionDays.FIVE_DAYS,
       removalPolicy: cdk.RemovalPolicy["DESTROY"]
     });
   
-    const audioProcessor = new NodejsFunction(scope, 'AudioProcessor', {
+    const audioProcessor = new NodejsFunction(this, 'AudioProcessor', {
       functionName: `borderless-voice-comm-audio-processor`,
       runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64,
@@ -181,13 +181,13 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
       }
     });
 
-    const ttsHandlerLogGroup = new logs.LogGroup(scope, 'VoiceCommTTSHandlerLogGroup', {
+    const ttsHandlerLogGroup = new logs.LogGroup(this, 'VoiceCommTTSHandlerLogGroup', {
       logGroupName: `/aws/lambda/borderless-voice-comm-tts-handler`,
       retention: logs.RetentionDays.FIVE_DAYS,
       removalPolicy: cdk.RemovalPolicy["DESTROY"]
     });
 
-    const ttsHandler = new NodejsFunction(scope, 'TTSHandler', {
+    const ttsHandler = new NodejsFunction(this, 'TTSHandler', {
       functionName: `borderless-voice-comm-tts-handler`,
       runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64,
