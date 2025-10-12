@@ -8,8 +8,6 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
-const { AWS_REGION, DDB_NAME, FUNCTION_NAME } = process.env;
-
 export class BorderlessVoiceCommStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -17,7 +15,7 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
     // DynamoDB Table for session management and conversation history
     // Stores transcription/translation results for debugging and analytics
     const sessionsTable = new dynamodb.Table(this, 'VoiceCommSessions', {
-      tableName: `${DDB_NAME}-sessions`,
+      tableName: `borderless-voice-comm-sessions`,
       partitionKey: { name: 'sessionId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'timestamp', type: dynamodb.AttributeType.NUMBER },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -67,78 +65,11 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
       expires: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60), // 1 year from now
     });
 
-    // Create Event Channels
-    const audioChannel = new appsync.CfnChannel(this, 'AudioChannel', {
-      apiId: eventsApi.attrApiId,
-      name: 'audio-events',
-      publishAuthModes: [
-        {
-          authType: 'AWS_IAM',
-        },
-      ],
-      subscribeAuthModes: [
-        {
-          authType: 'API_KEY',
-        },
-        {
-          authType: 'AWS_IAM',
-        },
-      ],
-    });
-
-    const transcriptionChannel = new appsync.CfnChannel(this, 'TranscriptionChannel', {
-      apiId: eventsApi.attrApiId,
-      name: 'transcription-events',
-      publishAuthModes: [
-        {
-          authType: 'AWS_IAM',
-        },
-      ],
-      subscribeAuthModes: [
-        {
-          authType: 'API_KEY',
-        },
-        {
-          authType: 'AWS_IAM',
-        },
-      ],
-    });
-
-    const translationChannel = new appsync.CfnChannel(this, 'TranslationChannel', {
-      apiId: eventsApi.attrApiId,
-      name: 'translation-events',
-      publishAuthModes: [
-        {
-          authType: 'AWS_IAM',
-        },
-      ],
-      subscribeAuthModes: [
-        {
-          authType: 'API_KEY',
-        },
-        {
-          authType: 'AWS_IAM',
-        },
-      ],
-    });
-
-    const ttsChannel = new appsync.CfnChannel(this, 'TTSChannel', {
-      apiId: eventsApi.attrApiId,
-      name: 'tts-events',
-      publishAuthModes: [
-        {
-          authType: 'AWS_IAM',
-        },
-      ],
-      subscribeAuthModes: [
-        {
-          authType: 'API_KEY',
-        },
-        {
-          authType: 'AWS_IAM',
-        },
-      ],
-    });
+    // AppSync Events API channels are just string names - no need to pre-create them
+    const audioChannelName = 'audio-events';
+    const transcriptionChannelName = 'transcription-events';
+    const translationChannelName = 'translation-events';
+    const ttsChannelName = 'tts-events';
 
     // Kinesis Video Streams Signaling Channel for WebRTC
     // This replaces custom signaling - AWS manages everything!
@@ -215,12 +146,12 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
       tracing: lambda.Tracing.ACTIVE,
       environment: {
         SESSIONS_TABLE: sessionsTable.tableName,
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
         BEDROCK_MODEL_ID: 'anthropic.claude-3-sonnet-20240229-v1:0',
         APPSYNC_API_ID: eventsApi.attrApiId,
         APPSYNC_API_ENDPOINT: eventsApi.attrApiArn,
-        TRANSCRIPTION_CHANNEL: transcriptionChannel.name,
-        TRANSLATION_CHANNEL: translationChannel.name,
+        TRANSCRIPTION_CHANNEL: transcriptionChannelName,
+        TRANSLATION_CHANNEL: translationChannelName,
         AWS_REGION: this.region,
       },
       timeout: cdk.Duration.seconds(60),
@@ -242,7 +173,7 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
         POLLY_VOICE_ID: 'Joanna',
         APPSYNC_API_ID: eventsApi.attrApiId,
         APPSYNC_API_ENDPOINT: eventsApi.attrApiArn,
-        TTS_CHANNEL: ttsChannel.name,
+        TTS_CHANNEL: ttsChannelName,
         AWS_REGION: this.region,
       },
       timeout: cdk.Duration.seconds(30),
@@ -320,25 +251,25 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'AudioChannelName', {
-      value: audioChannel.name,
+      value: audioChannelName,
       description: 'Audio Events Channel Name',
       exportName: 'AudioChannelName',
     });
 
     new cdk.CfnOutput(this, 'TranscriptionChannelName', {
-      value: transcriptionChannel.name,
+      value: transcriptionChannelName,
       description: 'Transcription Events Channel Name',
       exportName: 'TranscriptionChannelName',
     });
 
     new cdk.CfnOutput(this, 'TranslationChannelName', {
-      value: translationChannel.name,
+      value: translationChannelName,
       description: 'Translation Events Channel Name',
       exportName: 'TranslationChannelName',
     });
 
     new cdk.CfnOutput(this, 'TTSChannelName', {
-      value: ttsChannel.name,
+      value: ttsChannelName,
       description: 'TTS Events Channel Name',
       exportName: 'TTSChannelName',
     });
@@ -350,7 +281,7 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'KVSSignalingChannelName', {
-      value: kvsSignalingChannel.name,
+      value: kvsSignalingChannel.name!,
       description: 'Kinesis Video Streams Signaling Channel Name',
       exportName: 'KVSSignalingChannelName',
     });
