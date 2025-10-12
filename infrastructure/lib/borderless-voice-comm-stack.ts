@@ -140,7 +140,7 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
     const bundlingOptions: BundlingOptions = {
       minify: true, // Minify code for production
       sourceMap: true, // Include sourcemaps for easier debugging
-      target: 'node22', // Target Node.js version
+      target: 'node20', // Target Node.js version
       forceDockerBundling: false,
       nodeModules: [], // Bundle all node modules
       esbuildArgs: {
