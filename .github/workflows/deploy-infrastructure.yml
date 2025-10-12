@@ -23,6 +23,16 @@ on:
         required: false
         type: boolean
         default: false
+      skip_cognito:
+        description: 'Skip Cognito setup'
+        required: false
+        type: boolean
+        default: false
+      skip_client_build:
+        description: 'Skip client build'
+        required: false
+        type: boolean
+        default: false
 
 env:
   NODE_VERSION: 20
@@ -206,10 +216,45 @@ jobs:
         run: |
           POOL_ID="${{ steps.create-pool.outputs.identity-pool-id }}"
           ROLE_NAME="Cognito_BorderlessVoiceCommUnauth_Role"
+          KVS_CHANNEL_ARN="${{ needs.deploy-infrastructure.outputs.kvs-channel-arn }}"
+          
+          # Validate KVS Channel ARN
+          if [ -z "$KVS_CHANNEL_ARN" ]; then
+            echo "❌ Error: KVS Channel ARN is empty. Stack outputs may not be properly set."
+            exit 1
+          fi
+          
+          echo "Using KVS Channel ARN: $KVS_CHANNEL_ARN"
           
           # Check if role exists
           if aws iam get-role --role-name "$ROLE_NAME" 2>/dev/null; then
             echo "✅ IAM Role already exists: $ROLE_NAME"
+            
+            # Update the policy even if role exists to ensure it has the correct ARN
+            echo "Updating KVS permissions policy..."
+            cat > kvs-policy.json <<EOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "kinesisvideo:DescribeSignalingChannel",
+                  "kinesisvideo:GetSignalingChannelEndpoint",
+                  "kinesisvideo:GetIceServerConfig"
+                ],
+                "Resource": "$KVS_CHANNEL_ARN"
+              }
+            ]
+          }
+          EOF
+            
+            aws iam put-role-policy \
+              --role-name "$ROLE_NAME" \
+              --policy-name "KVSWebRTCAccess" \
+              --policy-document file://kvs-policy.json
+            
+            echo "✅ Updated KVS permissions on existing role"
           else
             echo "Creating IAM Role for unauthenticated access..."
             
@@ -244,7 +289,7 @@ jobs:
               --query 'Role.Arn' \
               --output text)
             
-            echo "✅ Created IAM Role: $ROLE_ARN"
+            echo "✅ Created IAM Role"
             
             # Create KVS permissions policy
             cat > kvs-policy.json <<EOF
@@ -258,7 +303,7 @@ jobs:
                   "kinesisvideo:GetSignalingChannelEndpoint",
                   "kinesisvideo:GetIceServerConfig"
                 ],
-                "Resource": "${{ needs.deploy-infrastructure.outputs.kvs-channel-arn }}"
+                "Resource": "$KVS_CHANNEL_ARN"
               }
             ]
           }
