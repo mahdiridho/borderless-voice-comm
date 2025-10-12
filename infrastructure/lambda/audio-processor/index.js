@@ -1,12 +1,27 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 const { BedrockRuntimeClient, InvokeModelCommand } = require('@aws-sdk/client-bedrock-runtime');
-const axios = require('axios');
 const FormData = require('form-data');
 const { SignatureV4 } = require('@smithy/signature-v4');
 const { HttpRequest } = require('@smithy/protocol-http');
 const { defaultProvider } = require('@aws-sdk/credential-provider-node');
-const { Sha256 } = require('@aws-crypto/sha256-js');
+const crypto = require('crypto');
+
+// Native Node.js crypto implementation for SHA256
+class Sha256 {
+  constructor(secret) {
+    this.secret = secret;
+    this.hash = crypto.createHash('sha256');
+  }
+
+  update(data) {
+    this.hash.update(data);
+  }
+
+  async digest() {
+    return this.hash.digest();
+  }
+}
 
 const dynamoClient = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(dynamoClient);
@@ -124,15 +139,21 @@ async function transcribeWithWhisper(audioBuffer, language) {
     formData.append('timestamp_granularities', '["word"]');
     formData.append('language', language);
     
-    const response = await axios.post('https://api.openai.com/v1/audio/transcriptions', formData, {
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
         ...formData.getHeaders(),
       },
-      timeout: 30000,
+      body: formData,
     });
     
-    return response.data.text || '';
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.text || '';
   } catch (error) {
     console.error('Error transcribing with Whisper:', error);
     throw new Error(`Transcription failed: ${error.message}`);
@@ -294,15 +315,19 @@ async function publishToAppSync(channel, namespace, data) {
     const signedRequest = await signer.sign(request);
     
     // Make the HTTP request
-    const response = await axios({
+    const response = await fetch(`https://${signedRequest.hostname}${signedRequest.path}`, {
       method: signedRequest.method,
-      url: `https://${signedRequest.hostname}${signedRequest.path}`,
       headers: signedRequest.headers,
-      data: signedRequest.body,
+      body: signedRequest.body,
     });
     
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
     console.log(`Published event to channel ${channel}/${namespace}:`, response.status);
-    return response.data;
+    return data;
   } catch (error) {
     console.error('Error publishing to AppSync:', error);
     throw error;

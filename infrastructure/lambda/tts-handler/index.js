@@ -4,8 +4,23 @@ const { PollyClient, SynthesizeSpeechCommand } = require('@aws-sdk/client-polly'
 const { SignatureV4 } = require('@smithy/signature-v4');
 const { HttpRequest } = require('@smithy/protocol-http');
 const { defaultProvider } = require('@aws-sdk/credential-provider-node');
-const { Sha256 } = require('@aws-crypto/sha256-js');
-const axios = require('axios');
+const crypto = require('crypto');
+
+// Native Node.js crypto implementation for SHA256
+class Sha256 {
+  constructor(secret) {
+    this.secret = secret;
+    this.hash = crypto.createHash('sha256');
+  }
+
+  update(data) {
+    this.hash.update(data);
+  }
+
+  async digest() {
+    return this.hash.digest();
+  }
+}
 
 const dynamoClient = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(dynamoClient);
@@ -176,15 +191,19 @@ async function publishToAppSync(channel, namespace, data) {
     const signedRequest = await signer.sign(request);
     
     // Make the HTTP request
-    const response = await axios({
+    const response = await fetch(`https://${signedRequest.hostname}${signedRequest.path}`, {
       method: signedRequest.method,
-      url: `https://${signedRequest.hostname}${signedRequest.path}`,
       headers: signedRequest.headers,
-      data: signedRequest.body,
+      body: signedRequest.body,
     });
     
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
     console.log(`Published event to channel ${channel}/${namespace}:`, response.status);
-    return response.data;
+    return data;
   } catch (error) {
     console.error('Error publishing to AppSync:', error);
     throw error;

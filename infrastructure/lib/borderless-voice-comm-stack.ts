@@ -138,11 +138,17 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
 
     // Define bundling options for esbuild
     const bundlingOptions: BundlingOptions = {
-      minify: true, // Minify code for production
-      sourceMap: true, // Include sourcemaps for easier debugging
-      target: 'node20', // Target Node.js version
+      minify: true,
+      sourceMap: true,
+      target: 'node22',
+      externalModules: [],
       forceDockerBundling: false,
-      nodeModules: [], // Bundle all node modules
+      nodeModules: [
+        'form-data',
+        '@smithy/signature-v4',
+        '@smithy/protocol-http',
+        '@aws-sdk/core'
+      ],
       esbuildArgs: {
         '--tree-shaking': 'true',
         '--minify-whitespace': 'true',
