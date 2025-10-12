@@ -10,8 +10,16 @@ on:
       - '.github/workflows/deploy-infrastructure.yml'
   workflow_dispatch:
     inputs:
-      destroy:
-        description: 'Destroy stack instead of deploying'
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - deploy
+          - destroy
+        default: deploy
+      force_deploy:
+        description: 'Force deploy (skip diff check)'
         required: false
         type: boolean
         default: false
@@ -49,9 +57,8 @@ jobs:
           cache: 'npm'
           cache-dependency-path: infrastructure/package-lock.json
       
-      # Configure AWS credentials using OIDC
-      - name: 🔐 Configure AWS Credentials (OIDC)
-        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+      # Configure AWS credentials (uses OIDC if AWS_ROLE_TO_ASSUME is set, otherwise access keys)
+      - name: 🔐 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
@@ -72,6 +79,7 @@ jobs:
         run: npm run build
       
       - name: 🔍 CDK Diff (show changes)
+        if: ${{ !inputs.force_deploy }}
         working-directory: infrastructure
         run: npx cdk diff
         continue-on-error: true
@@ -83,16 +91,16 @@ jobs:
           npx cdk bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ env.AWS_REGION }} || true
       
       - name: 🚀 Deploy CDK Stack
-        if: ${{ !inputs.destroy }}
+        if: ${{ inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') }}
         working-directory: infrastructure
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          echo "Deploying CDK stack..."
+          echo "Deploying CDK stack to ${{ env.AWS_REGION }}..."
           npx cdk deploy --require-approval never --outputs-file outputs.json
       
       - name: 💾 Upload CDK Outputs
-        if: ${{ !inputs.destroy }}
+        if: ${{ inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') }}
         uses: actions/upload-artifact@v4
         with:
           name: cdk-outputs
@@ -100,7 +108,7 @@ jobs:
           retention-days: 30
       
       - name: 📋 Parse Stack Outputs
-        if: ${{ !inputs.destroy }}
+        if: ${{ inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') }}
         id: stack-outputs
         working-directory: infrastructure
         run: |
@@ -121,14 +129,15 @@ jobs:
           fi
       
       - name: 🗑️ Destroy CDK Stack
-        if: ${{ inputs.destroy }}
+        if: ${{ inputs.action == 'destroy' }}
         working-directory: infrastructure
         run: |
-          echo "Destroying CDK stack..."
+          echo "⚠️ Destroying CDK stack in ${{ env.AWS_REGION }}..."
           npx cdk destroy --force
+          echo "✅ Stack destroyed successfully"
       
       - name: 📊 Display Deployment Summary
-        if: ${{ !inputs.destroy }}
+        if: ${{ inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') }}
         run: |
           echo "## 🎉 CDK Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -138,23 +147,35 @@ jobs:
           echo "| KVS Channel ARN | \`${{ steps.stack-outputs.outputs.kvs-channel-arn }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| KVS Channel Name | \`${{ steps.stack-outputs.outputs.kvs-channel-name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📝 Deployment Info:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region:** ${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "- **Action:** ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Skip Cognito:** ${{ inputs.skip_cognito }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Skip Client:** ${{ inputs.skip_client_build }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📝 Next Steps:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Create Cognito Identity Pool" >> $GITHUB_STEP_SUMMARY
-          echo "2. Update \`.env.local\` with these values" >> $GITHUB_STEP_SUMMARY
-          echo "3. Deploy the client application" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check Cognito Identity Pool setup (next job)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Client will be built automatically" >> $GITHUB_STEP_SUMMARY
+          echo "3. Review the full deployment in the Summary tab" >> $GITHUB_STEP_SUMMARY
 
   setup-cognito:
     name: Setup Cognito Identity Pool
     needs: deploy-infrastructure
     runs-on: ubuntu-latest
-    if: ${{ !inputs.destroy }}
+    if: ${{ !inputs.skip_cognito && inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') }}
+    
+    permissions:
+      id-token: write
+      contents: read
     
     outputs:
       identity-pool-id: ${{ steps.create-pool.outputs.identity-pool-id }}
     
     steps:
-      - name: 🔐 Configure AWS Credentials (OIDC)
-        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+      - name: 🔐 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
@@ -277,7 +298,11 @@ jobs:
     name: Build and Deploy Client
     needs: [deploy-infrastructure, setup-cognito]
     runs-on: ubuntu-latest
-    if: ${{ !inputs.destroy && github.ref == 'refs/heads/master' }}
+    if: ${{ !inputs.skip_client_build && inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') && github.ref == 'refs/heads/master' }}
+    
+    permissions:
+      id-token: write
+      contents: read
     
     steps:
       - name: 📥 Checkout code
@@ -292,8 +317,7 @@ jobs:
       - name: 📦 Install dependencies
         run: npm ci
       
-      - name: 🔐 Configure AWS Credentials (OIDC)
-        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+      - name: 🔐 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
