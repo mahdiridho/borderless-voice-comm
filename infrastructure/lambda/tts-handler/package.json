@@ -1,0 +1,16 @@
+{
+  "name": "tts-handler",
+  "version": "1.0.0",
+  "description": "Text-to-speech handler Lambda",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.450.0",
+    "@aws-sdk/lib-dynamodb": "^3.450.0",
+    "@aws-sdk/client-polly": "^3.450.0",
+    "@aws-sdk/credential-provider-node": "^3.450.0",
+    "@smithy/signature-v4": "^2.0.0",
+    "@smithy/protocol-http": "^3.0.0",
+    "@aws-crypto/sha256-js": "^5.0.0",
+    "axios": "^1.6.0"
+  }
+}
