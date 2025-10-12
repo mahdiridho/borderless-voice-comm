@@ -90,7 +90,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           echo "Deploying CDK stack to ${{ vars.AWS_REGION }}..."
-          npx cdk deploy --require-approval never --outputs-file outputs.json
+          npx cdk synth
+          npx cdk deploy --all --require-approval never --outputs-file outputs.json
       
       - name: 💾 Upload CDK Outputs
         if: ${{ inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') }}
