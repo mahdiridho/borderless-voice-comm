@@ -19,11 +19,11 @@
   "author": "Mahdi Ridho",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-kinesis-video": "^3.600.0",
+    "@aws-sdk/client-kinesis-video-signaling": "^3.600.0",
     "@aws-sdk/client-cognito-identity": "^3.600.0",
-    "@aws-sdk/client-lambda": "^3.600.0",
-    "@aws-sdk/client-polly": "^3.596.0",
-    "@aws-sdk/client-sqs": "^3.600.0",
     "@aws-sdk/credential-provider-cognito-identity": "^3.600.0",
+    "amazon-kinesis-video-streams-webrtc": "^2.0.9",
     "@collaborne/lit-flexbox-literals": "^0.2.2",
     "@material/mwc-button": "^0.22.0",
     "@material/mwc-circular-progress": "^0.22.0",
@@ -34,7 +34,7 @@
     "@material/mwc-textfield": "^0.22.0",
     "@spectrum-web-components/theme": "^0.9.0",
     "lit": "^2.0.2",
-    "recordrtc": "^5.6.2"
+    "ws": "^8.16.0"
   },
   "devDependencies": {
     "vite": "^5.2.11",
