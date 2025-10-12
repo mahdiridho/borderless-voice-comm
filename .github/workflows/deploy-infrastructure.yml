@@ -211,31 +211,6 @@ jobs:
           echo "⚠️ Destroying CDK stack in ${{ vars.AWS_REGION }}..."
           npx cdk destroy --force
           echo "✅ Stack destroyed successfully"
-      
-      - name: 📊 Display Deployment Summary
-        if: ${{ inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') }}
-        run: |
-          echo "## 🎉 CDK Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| AppSync API ID | \`${{ steps.stack-outputs.outputs.appsync-api-id }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| KVS Channel ARN | \`${{ steps.stack-outputs.outputs.kvs-channel-arn }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| KVS Channel Name | \`${{ steps.stack-outputs.outputs.kvs-channel-name }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Identity Pool ID | \`${{ steps.stack-outputs.outputs.identity-pool-id }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📝 Deployment Info:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Region:** ${{ vars.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "- **Action:** ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Skip Client:** ${{ inputs.skip_client_build }}" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📝 Next Steps:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Cognito Identity Pool is configured via CDK" >> $GITHUB_STEP_SUMMARY
-          echo "2. Client will be built automatically" >> $GITHUB_STEP_SUMMARY
-          echo "3. Review the full deployment in the Summary tab" >> $GITHUB_STEP_SUMMARY
 
   deploy-client:
     name: Build and Deploy Client
@@ -286,17 +261,6 @@ jobs:
       
       - name: 🔨 Build client
         run: npm run build
-      
-      - name: 📊 Display Build Summary
-        run: |
-          echo "## 🎨 Client Build Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Client built successfully!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🌐 Configuration" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          cat .env.local >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
       
       # Deploy to S3/CloudFront
       - name: 🚀 Deploy to S3

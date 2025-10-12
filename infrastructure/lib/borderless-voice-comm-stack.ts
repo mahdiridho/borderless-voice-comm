@@ -299,13 +299,13 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'AppSyncEventsHttpEndpoint', {
       value: `https://events.appsync-api.${this.region}.amazonaws.com/event`,
-      description: 'AppSync Events HTTP Endpoint',
+      description: 'AppSync Events HTTP Endpoint (use with x-api-key and x-api-id headers)',
       exportName: 'AppSyncEventsHttpEndpoint',
     });
 
     new cdk.CfnOutput(this, 'AppSyncEventsRealtimeEndpoint', {
       value: `wss://events.appsync-realtime-api.${this.region}.amazonaws.com/event/realtime`,
-      description: 'AppSync Events Realtime WebSocket Endpoint',
+      description: 'AppSync Events Realtime WebSocket Endpoint (use with x-api-key and x-api-id in header param)',
       exportName: 'AppSyncEventsRealtimeEndpoint',
     });
 

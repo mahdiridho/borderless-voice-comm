@@ -68,12 +68,15 @@ export class AppSyncEventsClient {
    * Build WebSocket URL with authentication
    */
   _buildWebSocketUrl() {
-    const realtimeEndpoint = `wss://${this.apiId}.appsync-realtime-api.${this.region}.amazonaws.com/event/realtime`;
+    // For AppSync Events API, use "events" subdomain, not the API ID
+    const realtimeEndpoint = `wss://events.appsync-realtime-api.${this.region}.amazonaws.com/event/realtime`;
     
     // Create connection header with API key authentication
+    // For Events API, we need host, x-api-key, and x-api-id
     const header = {
-      host: `${this.apiId}.appsync-api.${this.region}.amazonaws.com`,
+      host: `events.appsync-api.${this.region}.amazonaws.com`,
       'x-api-key': this.apiKey,
+      'x-api-id': this.apiId,
     };
     
     const headerBase64 = btoa(JSON.stringify(header));
@@ -251,13 +254,15 @@ export class AppSyncEventsClient {
     
     try {
       // For publishing, we use HTTP endpoint instead of WebSocket
-      const endpoint = `https://${this.apiId}.appsync-api.${this.region}.amazonaws.com/event`;
+      // For Events API, use "events" subdomain
+      const endpoint = `https://events.appsync-api.${this.region}.amazonaws.com/event`;
       
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': this.apiKey,
+          'x-api-id': this.apiId,
         },
         body: JSON.stringify({
           channel: channelName,

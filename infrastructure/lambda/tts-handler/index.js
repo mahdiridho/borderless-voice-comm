@@ -31,8 +31,8 @@ const APPSYNC_API_ID = process.env.APPSYNC_API_ID;
 const TTS_CHANNEL = process.env.TTS_CHANNEL;
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 
-// AppSync Events endpoint
-const APPSYNC_ENDPOINT = `https://${APPSYNC_API_ID}.appsync-api.${AWS_REGION}.amazonaws.com/event`;
+// AppSync Events endpoint (use "events" subdomain for Events API)
+const APPSYNC_ENDPOINT = `https://events.appsync-api.${AWS_REGION}.amazonaws.com/event`;
 
 exports.handler = async (event) => {
   console.log('TTS handler event:', JSON.stringify(event, null, 2));
@@ -176,6 +176,7 @@ async function publishToAppSync(channel, namespace, data) {
       headers: {
         'Content-Type': 'application/json',
         host: url.hostname,
+        'x-api-id': APPSYNC_API_ID,
       },
       body: JSON.stringify(eventData),
     });
