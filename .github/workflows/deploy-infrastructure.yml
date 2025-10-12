@@ -101,8 +101,23 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           echo "Deploying CDK stack to ${{ vars.AWS_REGION }}..."
+          
+          echo "🔍 Synthesizing CDK stack..."
           npx cdk synth
+          
+          echo "🚀 Deploying stack..."
           npx cdk deploy --all --require-approval never --outputs-file outputs.json
+          
+          echo "✅ Deployment completed"
+          
+          # Verify outputs.json was created
+          if [ ! -f outputs.json ]; then
+            echo "❌ Error: outputs.json was not created after deployment"
+            exit 1
+          fi
+          
+          echo "📄 Checking outputs.json structure..."
+          cat outputs.json | jq '.'
       
       - name: 💾 Upload CDK Outputs
         if: ${{ inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') }}
@@ -118,19 +133,40 @@ jobs:
         working-directory: infrastructure
         run: |
           if [ -f outputs.json ]; then
+            echo "📄 Raw outputs.json contents:"
+            cat outputs.json
+            echo ""
             echo "Parsing CDK outputs..."
-            STACK_OUTPUT=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack // {}')
             
-            echo "appsync-api-id=$(echo $STACK_OUTPUT | jq -r '.AppSyncEventsApiId // ""')" >> $GITHUB_OUTPUT
-            echo "appsync-api-key=$(echo $STACK_OUTPUT | jq -r '.AppSyncApiKey // ""')" >> $GITHUB_OUTPUT
-            echo "audio-processor-url=$(echo $STACK_OUTPUT | jq -r '.AudioProcessorUrl // ""')" >> $GITHUB_OUTPUT
-            echo "tts-handler-url=$(echo $STACK_OUTPUT | jq -r '.TTSHandlerUrl // ""')" >> $GITHUB_OUTPUT
-            echo "kvs-channel-arn=$(echo $STACK_OUTPUT | jq -r '.KVSSignalingChannelARN // ""')" >> $GITHUB_OUTPUT
-            echo "kvs-channel-name=$(echo $STACK_OUTPUT | jq -r '.KVSSignalingChannelName // ""')" >> $GITHUB_OUTPUT
+            # Parse the outputs
+            APPSYNC_API_ID=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.AppSyncEventsApiId // ""')
+            APPSYNC_API_KEY=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.AppSyncApiKey // ""')
+            AUDIO_PROCESSOR_URL=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.AudioProcessorUrl // ""')
+            TTS_HANDLER_URL=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.TTSHandlerUrl // ""')
+            KVS_CHANNEL_ARN=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.KVSSignalingChannelARN // ""')
+            KVS_CHANNEL_NAME=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.KVSSignalingChannelName // ""')
+            
+            # Debug: Show what we extracted
+            echo "📊 Extracted values:"
+            echo "  AppSync API ID: $APPSYNC_API_ID"
+            echo "  AppSync API Key: ${APPSYNC_API_KEY:0:10}..."
+            echo "  Audio Processor URL: $AUDIO_PROCESSOR_URL"
+            echo "  TTS Handler URL: $TTS_HANDLER_URL"
+            echo "  KVS Channel ARN: $KVS_CHANNEL_ARN"
+            echo "  KVS Channel Name: $KVS_CHANNEL_NAME"
+            
+            # Write to GITHUB_OUTPUT
+            echo "appsync-api-id=$APPSYNC_API_ID" >> $GITHUB_OUTPUT
+            echo "appsync-api-key=$APPSYNC_API_KEY" >> $GITHUB_OUTPUT
+            echo "audio-processor-url=$AUDIO_PROCESSOR_URL" >> $GITHUB_OUTPUT
+            echo "tts-handler-url=$TTS_HANDLER_URL" >> $GITHUB_OUTPUT
+            echo "kvs-channel-arn=$KVS_CHANNEL_ARN" >> $GITHUB_OUTPUT
+            echo "kvs-channel-name=$KVS_CHANNEL_NAME" >> $GITHUB_OUTPUT
             
             echo "✅ Stack outputs extracted successfully"
           else
             echo "⚠️ No outputs.json found"
+            exit 1
           fi
       
       - name: 🗑️ Destroy CDK Stack
@@ -218,13 +254,19 @@ jobs:
           ROLE_NAME="Cognito_BorderlessVoiceCommUnauth_Role"
           KVS_CHANNEL_ARN="${{ needs.deploy-infrastructure.outputs.kvs-channel-arn }}"
           
+          echo "🔍 Debug Info:"
+          echo "  Pool ID: $POOL_ID"
+          echo "  Role Name: $ROLE_NAME"
+          echo "  KVS Channel ARN: $KVS_CHANNEL_ARN"
+          
           # Validate KVS Channel ARN
-          if [ -z "$KVS_CHANNEL_ARN" ]; then
+          if [ -z "$KVS_CHANNEL_ARN" ] || [ "$KVS_CHANNEL_ARN" = "" ]; then
             echo "❌ Error: KVS Channel ARN is empty. Stack outputs may not be properly set."
+            echo "Please check the 'Parse Stack Outputs' step in the deploy-infrastructure job."
             exit 1
           fi
           
-          echo "Using KVS Channel ARN: $KVS_CHANNEL_ARN"
+          echo "✅ Using KVS Channel ARN: $KVS_CHANNEL_ARN"
           
           # Check if role exists
           if aws iam get-role --role-name "$ROLE_NAME" 2>/dev/null; then
