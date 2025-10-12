@@ -63,11 +63,6 @@ jobs:
           role-session-name: github-actions-cdk-deploy
           aws-region: ${{ vars.AWS_REGION }}
       
-      - name: ✅ Verify AWS credentials
-        run: |
-          aws sts get-caller-identity
-          echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"
-      
       - name: 📦 Install CDK dependencies
         working-directory: infrastructure
         run: npm ci

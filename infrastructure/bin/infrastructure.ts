@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { BorderlessVoiceCommStack } from './lib/borderless-voice-comm-stack';
+import { BorderlessVoiceCommStack } from '../lib/borderless-voice-comm-stack';
 
 const app = new cdk.App();
 
