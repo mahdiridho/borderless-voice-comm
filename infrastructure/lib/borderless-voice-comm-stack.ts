@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import * as appsync from 'aws-cdk-lib/aws-appsync';
 import * as kinesisvideo from 'aws-cdk-lib/aws-kinesisvideo';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import { NodejsFunction, BundlingOptions } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
@@ -77,6 +78,50 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
       name: 'borderless-voice-comm-signaling',
       type: 'SINGLE_MASTER', // One master (initiator), multiple viewers (receivers)
       messageTtlSeconds: 60,
+    });
+
+    // Cognito Identity Pool for unauthenticated access
+    const identityPool = new cognito.CfnIdentityPool(this, 'VoiceCommIdentityPool', {
+      identityPoolName: 'borderless-voice-comm-identity-pool',
+      allowUnauthenticatedIdentities: true,
+      allowClassicFlow: false,
+    });
+
+    // IAM Role for unauthenticated users
+    const unauthRole = new iam.Role(this, 'CognitoUnauthRole', {
+      roleName: 'Cognito_BorderlessVoiceCommUnauth_Role',
+      assumedBy: new iam.FederatedPrincipal(
+        'cognito-identity.amazonaws.com',
+        {
+          StringEquals: {
+            'cognito-identity.amazonaws.com:aud': identityPool.ref,
+          },
+          'ForAnyValue:StringLike': {
+            'cognito-identity.amazonaws.com:amr': 'unauthenticated',
+          },
+        },
+        'sts:AssumeRoleWithWebIdentity'
+      ),
+      description: 'IAM role for unauthenticated Cognito users',
+    });
+
+    // Add KVS permissions to unauthenticated role
+    unauthRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'kinesisvideo:DescribeSignalingChannel',
+        'kinesisvideo:GetSignalingChannelEndpoint',
+        'kinesisvideo:GetIceServerConfig',
+      ],
+      resources: [kvsSignalingChannel.attrArn],
+    }));
+
+    // Attach the role to the identity pool
+    new cognito.CfnIdentityPoolRoleAttachment(this, 'IdentityPoolRoleAttachment', {
+      identityPoolId: identityPool.ref,
+      roles: {
+        unauthenticated: unauthRole.roleArn,
+      },
     });
 
     // IAM Role for Lambda functions
@@ -316,6 +361,12 @@ export class BorderlessVoiceCommStack extends cdk.Stack {
       value: kvsSignalingChannel.name!,
       description: 'Kinesis Video Streams Signaling Channel Name',
       exportName: 'KVSSignalingChannelName',
+    });
+
+    new cdk.CfnOutput(this, 'CognitoIdentityPoolId', {
+      value: identityPool.ref,
+      description: 'Cognito Identity Pool ID for unauthenticated access',
+      exportName: 'CognitoIdentityPoolId',
     });
   }
 }

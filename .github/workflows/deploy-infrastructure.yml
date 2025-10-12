@@ -23,11 +23,6 @@ on:
         required: false
         type: boolean
         default: false
-      skip_cognito:
-        description: 'Skip Cognito setup'
-        required: false
-        type: boolean
-        default: false
       skip_client_build:
         description: 'Skip client build'
         required: false
@@ -54,6 +49,7 @@ jobs:
       tts-handler-url: ${{ steps.stack-outputs.outputs.tts-handler-url }}
       kvs-channel-arn: ${{ steps.stack-outputs.outputs.kvs-channel-arn }}
       kvs-channel-name: ${{ steps.stack-outputs.outputs.kvs-channel-name }}
+      identity-pool-id: ${{ steps.stack-outputs.outputs.identity-pool-id }}
     
     steps:
       - name: 📥 Checkout code
@@ -87,12 +83,6 @@ jobs:
       - name: 🔨 Build CDK project
         working-directory: infrastructure
         run: npm run build
-      
-      - name: 🎯 Bootstrap CDK (if needed)
-        working-directory: infrastructure
-        run: |
-          echo "Checking if CDK bootstrap is needed..."
-          npx cdk bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ vars.AWS_REGION }} || true
       
       - name: 🚀 Deploy CDK Stack
         if: ${{ inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') }}
@@ -138,6 +128,11 @@ jobs:
             echo ""
             echo "Parsing CDK outputs..."
             
+            # List all keys in the stack output
+            echo "🔍 Available output keys:"
+            cat outputs.json | jq -r '.BorderlessVoiceCommStack | keys[]' || echo "Could not list keys"
+            echo ""
+            
             # Parse the outputs
             APPSYNC_API_ID=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.AppSyncEventsApiId // ""')
             APPSYNC_API_KEY=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.AppSyncApiKey // ""')
@@ -145,6 +140,7 @@ jobs:
             TTS_HANDLER_URL=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.TTSHandlerUrl // ""')
             KVS_CHANNEL_ARN=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.KVSSignalingChannelARN // ""')
             KVS_CHANNEL_NAME=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.KVSSignalingChannelName // ""')
+            IDENTITY_POOL_ID=$(cat outputs.json | jq -r '.BorderlessVoiceCommStack.CognitoIdentityPoolId // ""')
             
             # Debug: Show what we extracted
             echo "📊 Extracted values:"
@@ -154,6 +150,44 @@ jobs:
             echo "  TTS Handler URL: $TTS_HANDLER_URL"
             echo "  KVS Channel ARN: $KVS_CHANNEL_ARN"
             echo "  KVS Channel Name: $KVS_CHANNEL_NAME"
+            echo "  Identity Pool ID: $IDENTITY_POOL_ID"
+            
+            # Validate critical outputs
+            if [ -z "$KVS_CHANNEL_ARN" ]; then
+              echo "⚠️ Warning: KVS Channel ARN is empty in outputs.json!"
+              echo "Attempting to fetch from CloudFormation stack directly..."
+              
+              # Try to get it from CloudFormation stack outputs
+              KVS_CHANNEL_ARN=$(aws cloudformation describe-stacks \
+                --stack-name BorderlessVoiceCommStack \
+                --query 'Stacks[0].Outputs[?OutputKey==`KVSSignalingChannelARN`].OutputValue' \
+                --output text 2>/dev/null || echo "")
+              
+              if [ ! -z "$KVS_CHANNEL_ARN" ] && [ "$KVS_CHANNEL_ARN" != "None" ]; then
+                echo "✅ Found KVS Channel ARN from CloudFormation: $KVS_CHANNEL_ARN"
+                # Update the KVS_CHANNEL_NAME as well
+                KVS_CHANNEL_NAME=$(aws cloudformation describe-stacks \
+                  --stack-name BorderlessVoiceCommStack \
+                  --query 'Stacks[0].Outputs[?OutputKey==`KVSSignalingChannelName`].OutputValue' \
+                  --output text 2>/dev/null || echo "borderless-voice-comm-signaling")
+                echo "✅ KVS Channel Name: $KVS_CHANNEL_NAME"
+              else
+                echo "⚠️ Could not find KVS Channel ARN in CloudFormation outputs either."
+                echo "Checking if KVS channel exists in AWS..."
+                aws kinesisvideo list-signaling-channels --query 'ChannelInfoList[?ChannelName==`borderless-voice-comm-signaling`]' || true
+              fi
+            fi
+            
+            # Final validation before writing outputs
+            echo ""
+            echo "📝 Final values to be written to outputs:"
+            echo "  AppSync API ID: $APPSYNC_API_ID"
+            echo "  AppSync API Key: ${APPSYNC_API_KEY:0:10}..."
+            echo "  Audio Processor URL: $AUDIO_PROCESSOR_URL"
+            echo "  TTS Handler URL: $TTS_HANDLER_URL"
+            echo "  KVS Channel ARN: $KVS_CHANNEL_ARN"
+            echo "  KVS Channel Name: $KVS_CHANNEL_NAME"
+            echo "  Identity Pool ID: $IDENTITY_POOL_ID"
             
             # Write to GITHUB_OUTPUT
             echo "appsync-api-id=$APPSYNC_API_ID" >> $GITHUB_OUTPUT
@@ -162,6 +196,7 @@ jobs:
             echo "tts-handler-url=$TTS_HANDLER_URL" >> $GITHUB_OUTPUT
             echo "kvs-channel-arn=$KVS_CHANNEL_ARN" >> $GITHUB_OUTPUT
             echo "kvs-channel-name=$KVS_CHANNEL_NAME" >> $GITHUB_OUTPUT
+            echo "identity-pool-id=$IDENTITY_POOL_ID" >> $GITHUB_OUTPUT
             
             echo "✅ Stack outputs extracted successfully"
           else
@@ -187,198 +222,24 @@ jobs:
           echo "| AppSync API ID | \`${{ steps.stack-outputs.outputs.appsync-api-id }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| KVS Channel ARN | \`${{ steps.stack-outputs.outputs.kvs-channel-arn }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| KVS Channel Name | \`${{ steps.stack-outputs.outputs.kvs-channel-name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Identity Pool ID | \`${{ steps.stack-outputs.outputs.identity-pool-id }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📝 Deployment Info:" >> $GITHUB_STEP_SUMMARY
           echo "- **Region:** ${{ vars.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "- **Action:** ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Skip Cognito:** ${{ inputs.skip_cognito }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Skip Client:** ${{ inputs.skip_client_build }}" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📝 Next Steps:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Check Cognito Identity Pool setup (next job)" >> $GITHUB_STEP_SUMMARY
+          echo "1. Cognito Identity Pool is configured via CDK" >> $GITHUB_STEP_SUMMARY
           echo "2. Client will be built automatically" >> $GITHUB_STEP_SUMMARY
           echo "3. Review the full deployment in the Summary tab" >> $GITHUB_STEP_SUMMARY
 
-  setup-cognito:
-    name: Setup Cognito Identity Pool
-    needs: deploy-infrastructure
-    runs-on: ubuntu-latest
-    if: ${{ !inputs.skip_cognito && inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') }}
-    
-    permissions:
-      id-token: write
-      contents: read
-    
-    outputs:
-      identity-pool-id: ${{ steps.create-pool.outputs.identity-pool-id }}
-    
-    steps:
-      - name: 🔐 Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          role-session-name: github-actions-cognito-setup
-          aws-region: ${{ vars.AWS_REGION }}
-      
-      - name: 🆔 Create or Get Cognito Identity Pool
-        id: create-pool
-        run: |
-          POOL_NAME="borderless-voice-comm"
-          
-          # Check if pool already exists
-          EXISTING_POOL=$(aws cognito-identity list-identity-pools --max-results 60 \
-            --query "IdentityPools[?IdentityPoolName=='$POOL_NAME'].IdentityPoolId" \
-            --output text)
-          
-          if [ ! -z "$EXISTING_POOL" ]; then
-            echo "✅ Cognito Identity Pool already exists: $EXISTING_POOL"
-            echo "identity-pool-id=$EXISTING_POOL" >> $GITHUB_OUTPUT
-          else
-            echo "Creating new Cognito Identity Pool..."
-            POOL_ID=$(aws cognito-identity create-identity-pool \
-              --identity-pool-name "$POOL_NAME" \
-              --allow-unauthenticated-identities \
-              --query 'IdentityPoolId' \
-              --output text)
-            
-            echo "✅ Created Cognito Identity Pool: $POOL_ID"
-            echo "identity-pool-id=$POOL_ID" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: 🔧 Setup IAM Role for Unauthenticated Access
-        run: |
-          POOL_ID="${{ steps.create-pool.outputs.identity-pool-id }}"
-          ROLE_NAME="Cognito_BorderlessVoiceCommUnauth_Role"
-          KVS_CHANNEL_ARN="${{ needs.deploy-infrastructure.outputs.kvs-channel-arn }}"
-          
-          echo "🔍 Debug Info:"
-          echo "  Pool ID: $POOL_ID"
-          echo "  Role Name: $ROLE_NAME"
-          echo "  KVS Channel ARN: $KVS_CHANNEL_ARN"
-          
-          # Validate KVS Channel ARN
-          if [ -z "$KVS_CHANNEL_ARN" ] || [ "$KVS_CHANNEL_ARN" = "" ]; then
-            echo "❌ Error: KVS Channel ARN is empty. Stack outputs may not be properly set."
-            echo "Please check the 'Parse Stack Outputs' step in the deploy-infrastructure job."
-            exit 1
-          fi
-          
-          echo "✅ Using KVS Channel ARN: $KVS_CHANNEL_ARN"
-          
-          # Check if role exists
-          if aws iam get-role --role-name "$ROLE_NAME" 2>/dev/null; then
-            echo "✅ IAM Role already exists: $ROLE_NAME"
-            
-            # Update the policy even if role exists to ensure it has the correct ARN
-            echo "Updating KVS permissions policy..."
-            cat > kvs-policy.json <<EOF
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Effect": "Allow",
-                "Action": [
-                  "kinesisvideo:DescribeSignalingChannel",
-                  "kinesisvideo:GetSignalingChannelEndpoint",
-                  "kinesisvideo:GetIceServerConfig"
-                ],
-                "Resource": "$KVS_CHANNEL_ARN"
-              }
-            ]
-          }
-          EOF
-            
-            aws iam put-role-policy \
-              --role-name "$ROLE_NAME" \
-              --policy-name "KVSWebRTCAccess" \
-              --policy-document file://kvs-policy.json
-            
-            echo "✅ Updated KVS permissions on existing role"
-          else
-            echo "Creating IAM Role for unauthenticated access..."
-            
-            # Create trust policy
-            cat > trust-policy.json <<EOF
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Effect": "Allow",
-                "Principal": {
-                  "Federated": "cognito-identity.amazonaws.com"
-                },
-                "Action": "sts:AssumeRoleWithWebIdentity",
-                "Condition": {
-                  "StringEquals": {
-                    "cognito-identity.amazonaws.com:aud": "$POOL_ID"
-                  },
-                  "ForAnyValue:StringLike": {
-                    "cognito-identity.amazonaws.com:amr": "unauthenticated"
-                  }
-                }
-              }
-            ]
-          }
-          EOF
-            
-            # Create role
-            ROLE_ARN=$(aws iam create-role \
-              --role-name "$ROLE_NAME" \
-              --assume-role-policy-document file://trust-policy.json \
-              --query 'Role.Arn' \
-              --output text)
-            
-            echo "✅ Created IAM Role"
-            
-            # Create KVS permissions policy
-            cat > kvs-policy.json <<EOF
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Effect": "Allow",
-                "Action": [
-                  "kinesisvideo:DescribeSignalingChannel",
-                  "kinesisvideo:GetSignalingChannelEndpoint",
-                  "kinesisvideo:GetIceServerConfig"
-                ],
-                "Resource": "$KVS_CHANNEL_ARN"
-              }
-            ]
-          }
-          EOF
-            
-            # Attach policy
-            aws iam put-role-policy \
-              --role-name "$ROLE_NAME" \
-              --policy-name "KVSWebRTCAccess" \
-              --policy-document file://kvs-policy.json
-            
-            echo "✅ Attached KVS permissions to role"
-            
-            # Attach identity pool to role
-            sleep 5  # Wait for role to be ready
-            aws cognito-identity set-identity-pool-roles \
-              --identity-pool-id "$POOL_ID" \
-              --roles unauthenticated="$ROLE_ARN"
-            
-            echo "✅ Associated role with Cognito Identity Pool"
-          fi
-      
-      - name: 📊 Display Cognito Summary
-        run: |
-          echo "## 🆔 Cognito Identity Pool Setup" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Identity Pool ID | \`${{ steps.create-pool.outputs.identity-pool-id }}\` |" >> $GITHUB_STEP_SUMMARY
-
   deploy-client:
     name: Build and Deploy Client
-    needs: [deploy-infrastructure, setup-cognito]
+    needs: deploy-infrastructure
     runs-on: ubuntu-latest
     if: ${{ !inputs.skip_client_build && inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') && github.ref == 'refs/heads/master' }}
     
@@ -409,7 +270,7 @@ jobs:
         run: |
           cat > .env.local <<EOF
           VITE_AWS_REGION=${{ vars.AWS_REGION }}
-          VITE_IDENTITY_POOL_ID=${{ needs.setup-cognito.outputs.identity-pool-id }}
+          VITE_IDENTITY_POOL_ID=${{ needs.deploy-infrastructure.outputs.identity-pool-id }}
           VITE_KVS_CHANNEL_ARN=${{ needs.deploy-infrastructure.outputs.kvs-channel-arn }}
           VITE_KVS_CHANNEL_NAME=${{ needs.deploy-infrastructure.outputs.kvs-channel-name }}
           VITE_APPSYNC_API_ID=${{ needs.deploy-infrastructure.outputs.appsync-api-id }}
