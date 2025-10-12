@@ -61,7 +61,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           role-session-name: github-actions-cdk-deploy
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
       
       - name: ✅ Verify AWS credentials
         run: |
@@ -86,7 +86,7 @@ jobs:
         working-directory: infrastructure
         run: |
           echo "Checking if CDK bootstrap is needed..."
-          npx cdk bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ env.AWS_REGION }} || true
+          npx cdk bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ vars.AWS_REGION }} || true
       
       - name: 🚀 Deploy CDK Stack
         if: ${{ inputs.action != 'destroy' && (github.event_name == 'push' || inputs.action == 'deploy') }}
@@ -94,7 +94,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          echo "Deploying CDK stack to ${{ env.AWS_REGION }}..."
+          echo "Deploying CDK stack to ${{ vars.AWS_REGION }}..."
           npx cdk deploy --require-approval never --outputs-file outputs.json
       
       - name: 💾 Upload CDK Outputs
@@ -130,7 +130,7 @@ jobs:
         if: ${{ inputs.action == 'destroy' }}
         working-directory: infrastructure
         run: |
-          echo "⚠️ Destroying CDK stack in ${{ env.AWS_REGION }}..."
+          echo "⚠️ Destroying CDK stack in ${{ vars.AWS_REGION }}..."
           npx cdk destroy --force
           echo "✅ Stack destroyed successfully"
       
@@ -146,7 +146,7 @@ jobs:
           echo "| KVS Channel Name | \`${{ steps.stack-outputs.outputs.kvs-channel-name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📝 Deployment Info:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Region:** ${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region:** ${{ vars.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "- **Action:** ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
@@ -178,7 +178,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           role-session-name: github-actions-cognito-setup
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
       
       - name: 🆔 Create or Get Cognito Identity Pool
         id: create-pool
@@ -319,12 +319,12 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           role-session-name: github-actions-cognito-setup
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
       
       - name: 📝 Create .env.local
         run: |
           cat > .env.local <<EOF
-          VITE_AWS_REGION=${{ env.AWS_REGION }}
+          VITE_AWS_REGION=${{ vars.AWS_REGION }}
           VITE_IDENTITY_POOL_ID=${{ needs.setup-cognito.outputs.identity-pool-id }}
           VITE_KVS_CHANNEL_ARN=${{ needs.deploy-infrastructure.outputs.kvs-channel-arn }}
           VITE_KVS_CHANNEL_NAME=${{ needs.deploy-infrastructure.outputs.kvs-channel-name }}
